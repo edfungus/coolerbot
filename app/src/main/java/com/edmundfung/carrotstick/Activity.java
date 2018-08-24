@@ -33,6 +33,8 @@ import com.edmundfung.common.rendering.BackgroundRenderer;
 import com.edmundfung.common.rendering.ObjectRenderer;
 import com.edmundfung.common.rendering.PlaneRenderer;
 import com.edmundfung.common.rendering.PointCloudRenderer;
+import com.edmundfung.common.vision.Blob;
+import com.edmundfung.common.vision.BlobFinder;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.Camera;
@@ -46,6 +48,7 @@ import com.google.ar.core.Session;
 import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
+import com.google.ar.core.exceptions.NotYetAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
@@ -53,6 +56,10 @@ import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.NoSuchElementException;
+
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -345,42 +352,55 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
   private void handleTap(Frame frame, Camera camera) {
     MotionEvent tap = tapHelper.poll();
     if (tap != null && camera.getTrackingState() == TrackingState.TRACKING) {
-      for (HitResult hit : frame.hitTest(tap)) {
-        // Check if any plane was hit, and if it was hit inside the plane polygon
-        Trackable trackable = hit.getTrackable();
-        // Creates an anchor if a plane or an oriented point was hit.
-        if ((trackable instanceof Plane
-                && ((Plane) trackable).isPoseInPolygon(hit.getHitPose())
-                && (PlaneRenderer.calculateDistanceToPlane(hit.getHitPose(), camera.getPose()) > 0))
-            || (trackable instanceof Point
-                && ((Point) trackable).getOrientationMode()
-                    == OrientationMode.ESTIMATED_SURFACE_NORMAL)) {
-          // Hits are sorted by depth. Consider only closest hit on a plane or oriented point.
-          // Cap the number of objects created. This avoids overloading both the
-          // rendering system and ARCore.
-          if (anchors.size() >= 20) {
-            anchors.get(0).anchor.detach();
-            anchors.remove(0);
-          }
+      try {
+        // perform color based scan and use that location as tap location
+        BlobFinder bf = new BlobFinder(frame);
+        List<Blob> blobs = bf.Find();
+        Blob biggestBlob = Collections.max(blobs);
+        float[] hitCoords = bf.ScaleCoordsToScreen(biggestBlob.GetCenter()[0], biggestBlob.GetCenter()[1]);
 
-          // Assign a color to the object for rendering based on the trackable type
-          // this anchor attached to. For AR_TRACKABLE_POINT, it's blue color, and
-          // for AR_TRACKABLE_PLANE, it's green color.
-          float[] objColor;
-          if (trackable instanceof Point) {
-            objColor = new float[] {66.0f, 133.0f, 244.0f, 255.0f};
-          } else if (trackable instanceof Plane) {
-            objColor = new float[] {139.0f, 195.0f, 74.0f, 255.0f};
-          } else {
-            objColor = DEFAULT_COLOR;
-          }
+        for (HitResult hit : frame.hitTest(hitCoords[0], hitCoords[1])) {
+          // Check if any plane was hit, and if it was hit inside the plane polygon
+          Trackable trackable = hit.getTrackable();
+          // Creates an anchor if a plane or an oriented point was hit.
+          if ((trackable instanceof Plane
+                  && ((Plane) trackable).isPoseInPolygon(hit.getHitPose())
+                  && (PlaneRenderer.calculateDistanceToPlane(hit.getHitPose(), camera.getPose()) > 0))
+              || (trackable instanceof Point
+                  && ((Point) trackable).getOrientationMode()
+                      == OrientationMode.ESTIMATED_SURFACE_NORMAL)) {
+            // Hits are sorted by depth. Consider only closest hit on a plane or oriented point.
+            // Cap the number of objects created. This avoids overloading both the
+            // rendering system and ARCore.
+            if (anchors.size() >= 1) {
+              anchors.get(0).anchor.detach();
+              anchors.remove(0);
+            }
 
-          // Adding an Anchor tells ARCore that it should track this position in
-          // space. This anchor is created on the Plane to place the 3D model
-          // in the correct position relative both to the world and to the plane.
-          anchors.add(new ColoredAnchor(hit.createAnchor(), objColor));
-          break;
+            // Assign a color to the object for rendering based on the trackable type
+            // this anchor attached to. For AR_TRACKABLE_POINT, it's blue color, and
+            // for AR_TRACKABLE_PLANE, it's green color.
+            float[] objColor;
+            if (trackable instanceof Point) {
+              objColor = new float[] {66.0f, 133.0f, 244.0f, 255.0f};
+            } else if (trackable instanceof Plane) {
+              objColor = new float[] {139.0f, 195.0f, 74.0f, 255.0f};
+            } else {
+              objColor = DEFAULT_COLOR;
+            }
+
+            // Adding an Anchor tells ARCore that it should track this position in
+            // space. This anchor is created on the Plane to place the 3D model
+            // in the correct position relative both to the world and to the plane.
+            anchors.add(new ColoredAnchor(hit.createAnchor(), objColor));
+            break;
+          }
         }
+      } catch (NotYetAvailableException | IllegalArgumentException e) {
+        // not ready yet
+        return;
+      } catch (NoSuchElementException e) {
+        Log.d("EDMUND - EXCEPTION!!!!", e.toString());
       }
     }
   }
