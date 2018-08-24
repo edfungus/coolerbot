@@ -16,7 +16,7 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.google.ar.core.examples.java.helloar">
+    package="com.edmundfung.carrotstick">
 
   <uses-permission android:name="android.permission.CAMERA"/>
   <!-- This tag indicates that this application requires ARCore.  This results in the application
@@ -33,7 +33,7 @@
       tools:ignore="GoogleAppIndexingWarning">
 
     <activity
-        android:name="com.google.ar.core.examples.java.helloar.HelloArActivity"
+        android:name="com.edmundfung.carrotstick.Activity"
         android:configChanges="orientation|screenSize"
         android:exported="true"
         android:theme="@style/Theme.AppCompat.NoActionBar"

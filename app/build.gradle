@@ -3,7 +3,7 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion 27
     defaultConfig {
-        applicationId "com.google.ar.core.examples.java.helloar"
+        applicationId "com.edmundfung.carrotstick"
 
         // 24 is the minimum since ARCore only works with 24 and higher.
         minSdkVersion 24
