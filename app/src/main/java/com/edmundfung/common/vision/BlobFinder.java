@@ -16,6 +16,7 @@ public class BlobFinder {
     private int stride;
     private int pixelStride;
     private byte[] inputPixelsV = new byte[0]; // Reuse java byte array to avoid multiple allocations.
+    private byte[] inputPixelsU = new byte[0]; // Reuse java byte array to avoid multiple allocations.
 
     private static final int encodingBlockSize = 2; // encoding uses a 2x2 block size
 
@@ -38,6 +39,12 @@ public class BlobFinder {
         }
         inputV.position(0);
         inputV.get(inputPixelsV);
+        ByteBuffer inputU = image.getPlanes()[1].getBuffer();
+        if (inputU.capacity() != inputPixelsU.length) {
+            inputPixelsU = new byte[inputU.capacity()];
+        }
+        inputU.position(0);
+        inputU.get(inputPixelsU);
 
         image.close();
     }
@@ -47,9 +54,15 @@ public class BlobFinder {
         BlobLocator bl = new BlobLocator(width, height, stride);
         // Go through all pixels in the V space and map to pixel space
         int inputEnd = inputPixelsV.length - (stride/encodingBlockSize) - 1;
-        int j = 0;
-        for (int i = 0; i < inputEnd; i+=pixelStride){
-            if (inputPixelsV[i] < (byte) 0xD0 && inputPixelsV[i] > (byte) 0xB0){
+
+        // Starting not at 0 to stay within bounds during marking since we mark a larger area for
+        // smoothing
+        int j = 2*stride;
+        for (int i = 2*stride; i < inputEnd; i+=pixelStride){
+            // U has "0xFF" at 0x7F and "0x00" at 0x80 so it makes the partitioning statement tricky
+            boolean uSpace = (inputPixelsU[i] > (byte) 0x6A && inputPixelsU[i] < (byte) 0x7F) || (inputPixelsU[i] > (byte) 0x80 && inputPixelsU[i] < (byte) 0x9A);
+            boolean vSpace = inputPixelsV[i] > (byte) 0xA0 && inputPixelsV[i] < (byte) 0xD0;
+            if (j >= 2 && uSpace && vSpace){
                 bl.Mark(j);
             }
             j+=encodingBlockSize;

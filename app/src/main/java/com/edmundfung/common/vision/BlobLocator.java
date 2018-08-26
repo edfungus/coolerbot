@@ -28,6 +28,16 @@ public class BlobLocator {
             markedCache[j + 1] = true;
             markedCache[j + stride] = true;
             markedCache[j + stride + 1] = true;
+
+            // Additional none true pixel marker for smoothing
+            markedCache[j+stride-1] = true;
+            markedCache[j-1] = true;
+            markedCache[j-stride] = true;
+            markedCache[j-stride+1] = true;
+            markedCache[j-stride-1] = true;
+            markedCache[j-stride-2] = true;
+            markedCache[j-2*stride-1] = true;
+            markedCache[j-2*stride-2] = true;
         } catch (ArrayIndexOutOfBoundsException e) {
             // ignore...
         }
@@ -44,7 +54,7 @@ public class BlobLocator {
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < height; j++) {
                 if (checkPoint(i,j)) {
-                    Blob b = new Blob();
+                    Blob b = new Blob(width, height);
 
                     Point p = new Point(i,j,stride);
                     queue.add(p);
