@@ -22,6 +22,7 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.edmundfung.common.helpers.CameraPermissionHelper;
@@ -45,6 +46,7 @@ import com.google.ar.core.Plane;
 import com.google.ar.core.Point;
 import com.google.ar.core.Point.OrientationMode;
 import com.google.ar.core.PointCloud;
+import com.google.ar.core.Pose;
 import com.google.ar.core.Session;
 import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
@@ -60,6 +62,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Random;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -81,6 +84,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
   private final SnackbarHelper messageSnackbarHelper = new SnackbarHelper();
   private DisplayRotationHelper displayRotationHelper;
   private TapHelper tapHelper;
+  private TextView mainText;
 
   private final BackgroundRenderer backgroundRenderer = new BackgroundRenderer();
   private final ObjectRenderer virtualObject = new ObjectRenderer();
@@ -122,6 +126,8 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
     surfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0); // Alpha used for plane blending.
     surfaceView.setRenderer(this);
     surfaceView.setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
+
+    mainText = findViewById(R.id.mainText);
 
     installRequested = false;
   }
@@ -281,6 +287,17 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
       // Handle one tap per frame.
       handleTap(frame, camera);
 
+      // Print distance
+      runOnUiThread(
+      new Runnable() {
+        @Override
+        public void run() {
+          if (!anchors.isEmpty()) {
+            mainText.setText(String.format("distance: %.2f", distanceBetweenPoses(camera.getPose(), anchors.get(0).anchor.getPose())));
+          }
+        }
+      });
+
       // Draw background.
       backgroundRenderer.draw(frame);
 
@@ -385,7 +402,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
             if (trackable instanceof Point) {
               objColor = new float[] {66.0f, 133.0f, 244.0f, 255.0f};
             } else if (trackable instanceof Plane) {
-              objColor = new float[] {139.0f, 195.0f, 74.0f, 255.0f};
+              objColor = new float[] {randomColorFloat(), randomColorFloat(), randomColorFloat(), 255.0f};
             } else {
               objColor = DEFAULT_COLOR;
             }
@@ -393,7 +410,9 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
             // Adding an Anchor tells ARCore that it should track this position in
             // space. This anchor is created on the Plane to place the 3D model
             // in the correct position relative both to the world and to the plane.
-            anchors.add(new ColoredAnchor(hit.createAnchor(), objColor));
+            Anchor currentAnchor = hit.createAnchor();
+            anchors.add(new ColoredAnchor(currentAnchor, objColor));
+
             break;
           }
         }
@@ -404,5 +423,18 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
         Log.d("EDMUND - EXCEPTION!!!!", e.toString());
       }
     }
+  }
+
+  private static final Random r = new Random();
+  private static final float maxColorValue = 255.0f;
+  private float randomColorFloat() {
+    return r.nextFloat() * maxColorValue;
+  }
+
+  private float distanceBetweenPoses(Pose p1, Pose p2) {
+    float dx = p1.tx() - p2.tx();
+    float dy = p1.ty() - p2.ty();
+    float dz = p1.tz() - p2.tz();
+    return (float) Math.sqrt(dx*dx + dy*dy + dz*dz);
   }
 }

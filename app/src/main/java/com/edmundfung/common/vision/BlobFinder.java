@@ -80,7 +80,7 @@ public class BlobFinder {
     public float[] ScaleCoordsToScreen(int x, int y) {
         float thx = screenX - (((float) y * screenX) / (float) height);
         float twy = ((float) x * screenY) / (float) width;
-        Log.d("EDMUND", String.format("x: %d, y:%d, tw: %f, th: %f, w: %d, h: %d", x, y, twy, thx, width, height));
+//        Log.d("EDMUND", String.format("x: %d, y:%d, tw: %f, th: %f, w: %d, h: %d", x, y, twy, thx, width, height));
         return new float[]{thx, twy};
     }
 }

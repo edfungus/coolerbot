@@ -25,4 +25,15 @@
       android:layout_height="fill_parent"
       android:layout_gravity="top"/>
 
+  <TextView
+      android:id="@+id/mainText"
+      android:layout_width="fill_parent"
+      android:layout_height="wrap_content"
+      android:padding="20px"
+      android:text="GETTA PLANE AND FIND THE PINK THING!"
+      android:layout_alignParentTop="true"
+      android:layout_alignParentLeft="true"
+      android:textColor="#ffffff"
+      android:background="#55000000"/>
+
 </RelativeLayout>
