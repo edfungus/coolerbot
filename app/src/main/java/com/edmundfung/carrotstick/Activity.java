@@ -39,7 +39,6 @@ import com.edmundfung.common.vision.BlobFinder;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.Camera;
-import com.google.ar.core.Config;
 import com.google.ar.core.Frame;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Plane;
@@ -47,7 +46,6 @@ import com.google.ar.core.Point;
 import com.google.ar.core.Point.OrientationMode;
 import com.google.ar.core.PointCloud;
 import com.google.ar.core.Pose;
-import com.google.ar.core.Quaternion;
 import com.google.ar.core.Session;
 import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
@@ -462,8 +460,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
     // atan2 gives angles like: -180 0 +180 where 0 is horizontal, + is clockwise and - is counter-
     // clockwise
     double angle = Math.toDegrees(Math.atan2((camera.tz() - anchor.tz()), (camera.tx() - anchor.tx())));
-    float adjustment = (camera.qy()) * 180;
-    camera.extractRotation();
+    double adjustment = -1 * quaternionToAngleY(camera);
     // Make it all clockwise
     double adjustedAngle = Math.abs(angle - adjustment);
 
@@ -471,11 +468,6 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
     if (adjustedAngle > 180) {
       adjustedAngle = 360 - adjustedAngle;
     }
-
-    double hypotenuse = Math.sqrt(Math.pow(camera.tz() - anchor.tz(), 2) + Math.pow(camera.tx() - anchor.tx(), 2));
-    double distance = Math.cos(Math.toRadians(adjustedAngle)) * hypotenuse;
-
-//    Log.d("EDMUND", String.format("distance: %.2fm", distance));
 
     // Convert the angle to something we can print
     double adjustedAngleWithFOV = adjustedAngle;
@@ -500,7 +492,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
       meterIndex = meterLength;
     }
 
-    String log = String.format("angle: %.2f adj: %.2f adjAngle: %.2f dis: %.2f", angle, adjustment, adjustedAngle, distance);
+    String log = String.format("angle: %.2f adj: %.2f adjAngle: %.2f", angle, adjustment, adjustedAngle);
     String log2 = String.format("x: %.2f y: %.2f z: %.2f cqx: %.2f cqy: %.2f cqz: %.2f cqw: %.2f", camera.tx(), camera.ty(), camera.tz(), camera.qx(), camera.qy(), camera.qz(), camera.qw());
 
     StringBuffer b = new StringBuffer();
@@ -512,5 +504,15 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
       }
     }
     return b.toString() + "\n" + log + "\n" + log2;
+  }
+
+  private double quaternionToAngleY(Pose p) {
+    double t = 2.0 * (p.qw() * p.qy() - p.qz() * p.qx());
+    if(t > 1) {
+      t = 1;
+    } else if(t < -1){
+      t = -1;
+    }
+    return Math.toDegrees(Math.asin(t));
   }
 }
