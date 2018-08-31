@@ -460,7 +460,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
     // atan2 gives angles like: -180 0 +180 where 0 is horizontal, + is clockwise and - is counter-
     // clockwise
     double angle = Math.toDegrees(Math.atan2((camera.tz() - anchor.tz()), (camera.tx() - anchor.tx())));
-    double adjustment = eulerYAngleToAdjustment(camera.qy(), quaternionToAngleY(camera));
+    double adjustment = quaternionToAngleY(camera);
     // Make it all clockwise
     double adjustedAngle = Math.abs(angle - adjustment);
 
@@ -503,7 +503,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
         b.append(blank);
       }
     }
-    return b.toString() + "\n" + log + "\n" + log2;
+    return b.toString();
   }
 
   private double quaternionToAngleY(Pose p) {
@@ -513,12 +513,8 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
     } else if(t < -1){
       t = -1;
     }
-    return Math.toDegrees(Math.asin(t));
-  }
-
-  private double eulerYAngleToAdjustment(double qy, double angle) {
-    // If true, we are starting to point behind us
-    if (qy <= -0.70) {
+    double angle = Math.toDegrees(Math.asin(t));
+    if (p.qy() <= -0.70) {
       if (angle < 0) {
         angle = -180 - angle;
       } else {
