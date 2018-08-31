@@ -47,6 +47,7 @@ import com.google.ar.core.Point;
 import com.google.ar.core.Point.OrientationMode;
 import com.google.ar.core.PointCloud;
 import com.google.ar.core.Pose;
+import com.google.ar.core.Quaternion;
 import com.google.ar.core.Session;
 import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
@@ -61,6 +62,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Random;
 
@@ -293,7 +295,16 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
         @Override
         public void run() {
           if (!anchors.isEmpty()) {
-            mainText.setText(String.format("distance: %.2f", distanceBetweenPoses(camera.getPose(), anchors.get(0).anchor.getPose())));
+//            mainText.setText(String.format(Locale.ENGLISH,"%s\nx: %.2f y: %.2f z: %.2f w: %.2f x: %.2f y: %.2f z: %.2f",
+            mainText.setText(String.format(Locale.ENGLISH,"%s",
+                    createDirectionMeter(camera.getPose(), anchors.get(0).anchor.getPose()),
+                    camera.getPose().tx(),
+                    camera.getPose().ty(),
+                    camera.getPose().tz(),
+                    camera.getPose().qw(),
+                    camera.getPose().qx(),
+                    camera.getPose().qy(),
+                    camera.getPose().qz()));
           }
         }
       });
@@ -435,6 +446,71 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
     float dx = p1.tx() - p2.tx();
     float dy = p1.ty() - p2.ty();
     float dz = p1.tz() - p2.tz();
+    Log.d("EDMUND", String.format("p1x: %.2f p1z: %.2f p2x: %.2f p2z: %.2f", p1.tx(), p1.tz(), p2.tx(), p2.tz()));
     return (float) Math.sqrt(dx*dx + dy*dy + dz*dz);
+  }
+
+  private static final int meterLength = 104;
+  private static final int fov = 40;
+  private static final char blank = '-';
+  private static final char target = ':';
+  private String createDirectionMeter(Pose camera, Pose anchor) {
+    // NOTE:
+    // x: left and right
+    // y: up and down
+    // z: back and forth
+    // atan2 gives angles like: -180 0 +180 where 0 is horizontal, + is clockwise and - is counter-
+    // clockwise
+    double angle = Math.toDegrees(Math.atan2((camera.tz() - anchor.tz()), (camera.tx() - anchor.tx())));
+    float adjustment = (camera.qy()) * 180;
+    camera.extractRotation();
+    // Make it all clockwise
+    double adjustedAngle = Math.abs(angle - adjustment);
+
+    // We don't care about front vs back right now so flip everything to the front
+    if (adjustedAngle > 180) {
+      adjustedAngle = 360 - adjustedAngle;
+    }
+
+    double hypotenuse = Math.sqrt(Math.pow(camera.tz() - anchor.tz(), 2) + Math.pow(camera.tx() - anchor.tx(), 2));
+    double distance = Math.cos(Math.toRadians(adjustedAngle)) * hypotenuse;
+
+//    Log.d("EDMUND", String.format("distance: %.2fm", distance));
+
+    // Convert the angle to something we can print
+    double adjustedAngleWithFOV = adjustedAngle;
+    int fovLowerBound = 90 - fov/2;
+    int fovUpperBound = 90 + fov/2;
+    // If out of fov on the left
+    if (adjustedAngleWithFOV < fovLowerBound) {
+      adjustedAngleWithFOV = fovLowerBound;
+    }
+    // If out of fov on the right
+    if (adjustedAngleWithFOV > fovUpperBound) {
+      adjustedAngleWithFOV = fovUpperBound;
+    }
+    // Squash to range: 0 to fov
+    adjustedAngleWithFOV-=fovLowerBound;
+    // Convert to index on meter
+    int meterIndex = ((int) Math.round(adjustedAngleWithFOV) * meterLength) / fov;
+    if (meterIndex < 0) {
+      meterIndex = 0;
+    }
+    if (meterIndex > meterLength) {
+      meterIndex = meterLength;
+    }
+
+    String log = String.format("angle: %.2f adj: %.2f adjAngle: %.2f dis: %.2f", angle, adjustment, adjustedAngle, distance);
+    String log2 = String.format("x: %.2f y: %.2f z: %.2f cqx: %.2f cqy: %.2f cqz: %.2f cqw: %.2f", camera.tx(), camera.ty(), camera.tz(), camera.qx(), camera.qy(), camera.qz(), camera.qw());
+
+    StringBuffer b = new StringBuffer();
+    for (int i = 0; i < meterLength; i++) {
+      if (i == meterIndex - 1 || i == meterIndex || i == meterIndex + 1) {
+        b.append(target);
+      } else {
+        b.append(blank);
+      }
+    }
+    return b.toString() + "\n" + log + "\n" + log2;
   }
 }
