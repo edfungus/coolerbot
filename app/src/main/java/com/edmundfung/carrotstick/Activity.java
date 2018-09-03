@@ -16,31 +16,16 @@
 
 package com.edmundfung.carrotstick;
 
-import android.Manifest;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattService;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
-import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanResult;
-import android.content.Context;
-import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.edmundfung.common.controller.Bot;
 import com.edmundfung.common.helpers.BluetoothPermissionHelper;
 import com.edmundfung.common.helpers.CameraPermissionHelper;
 import com.edmundfung.common.helpers.DisplayRotationHelper;
@@ -80,7 +65,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Random;
-import java.util.UUID;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -110,26 +94,11 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
   private final PlaneRenderer planeRenderer = new PlaneRenderer();
   private final PointCloudRenderer pointCloudRenderer = new PointCloudRenderer();
 
+  private final Bot bot = new Bot(this);
+
   // Temporary matrix allocated here to reduce number of allocations for each frame.
   private final float[] anchorMatrix = new float[16];
   private static final float[] DEFAULT_COLOR = new float[] {0f, 0f, 0f, 0f};
-
-  private BluetoothManager bluetoothManager;
-  private BluetoothLeScanner bluetoothScanner;
-  private BluetoothGatt bluetoothGatt;
-  private static boolean bluetoothConnected = false;
-  private final ScanCallback scanCallback = new ScanCallback() {
-    @Override
-    public void onScanResult(int callbackType, ScanResult result) {
-      Log.d("EDMUND", result.getDevice().getAddress());
-      if (result.getDevice().getAddress().equals("30:AE:A4:73:B2:26")) {
-        bluetoothScanner.stopScan(scanCallback);
-        connectGatt(result.getDevice());
-      }
-    }
-  };
-  private static final UUID serviceUUID =  UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
-  private static final UUID characteristicUUID =  UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
 
   // Anchors created from taps used for object placing with a given color.
   private static class ColoredAnchor {
@@ -230,71 +199,13 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
       return;
     }
 
-    if (!BluetoothPermissionHelper.hasBluetoothPermissions(this)) {
-      BluetoothPermissionHelper.requestBluetoothPermissions(this);
-      return;
-    }
-
-    // bluetooth stuff
-    bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-//    if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
-//            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
-//            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED) {
-      messageSnackbarHelper.showMessage(this, "waiting for bluetooth connection ...");
-      BluetoothAdapter bluetoothAdapter = bluetoothManager.getAdapter();
-      if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-        Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-        startActivityForResult(enableBtIntent, BluetoothPermissionHelper.REQUEST_ENABLE_BT);
-      }
-      bluetoothScanner = bluetoothAdapter.getBluetoothLeScanner();
-      bluetoothScanner.startScan(scanCallback);
-//    }
+    bot.Connect();
 
     surfaceView.onResume();
     displayRotationHelper.onResume();
   }
 
-  private void notifySnack(String message) {
-    messageSnackbarHelper.showMessageWithDismiss(this, message);
-  }
 
-  private void hideSnack() {
-    messageSnackbarHelper.hide(this);
-  }
-
-  private void connectGatt(BluetoothDevice device) {
-    bluetoothGatt = device.connectGatt(this, true,
-      new BluetoothGattCallback() {
-        @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-          super.onConnectionStateChange(gatt, status, newState);
-          if (newState == BluetoothProfile.STATE_CONNECTED) {
-            bluetoothConnected = true;
-            hideSnack();
-            bluetoothGatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
-            bluetoothGatt.discoverServices();
-          }
-          if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-            bluetoothConnected = false;
-            notifySnack("bluetooth disconnected!");
-          }
-        }
-
-        @Override
-        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-          Log.d("EDMUND", gatt.getServices().toString());
-          if (status == BluetoothGatt.GATT_SUCCESS) {
-            BluetoothGattService service = gatt.getService(serviceUUID);
-            if (service != null) {
-              Log.i(TAG, "Service characteristic UUID found: " + service.getUuid().toString());
-            } else {
-              Log.i(TAG, "Service characteristic not found for UUID: " + serviceUUID);
-            }
-          }
-        }
-      }
-    );
-  }
 
 
   @Override
@@ -308,19 +219,19 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
       surfaceView.onPause();
       session.pause();
     }
-    bluetoothScanner.stopScan(scanCallback);
+    bot.StopScan();
   }
 
   @Override
   public void onDestroy() {
     super.onDestroy();
-    bluetoothScanner.stopScan(scanCallback);
+    bot.StopScan();
   }
 
   @Override
   public void onStop() {
     super.onStop();
-    bluetoothScanner.stopScan(scanCallback);
+    bot.StopScan();
   }
 
 
@@ -427,9 +338,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
 //            mainText.setText(String.format(Locale.ENGLISH,"%s\nx: %.2f y: %.2f z: %.2f w: %.2f x: %.2f y: %.2f z: %.2f",
             String msg = String.format(Locale.ENGLISH,"%s\ndistance: %.2f",
                     createDirectionMeter(camera.getPose(), anchors.get(0).anchor.getPose()), distanceBetweenPoses(anchors.get(0).anchor.getPose(), camera.getPose()));
-            BluetoothGattCharacteristic ch = bluetoothGatt.getService(serviceUUID).getCharacteristic(characteristicUUID);
-            ch.setValue(msg);
-            bluetoothGatt.writeCharacteristic(ch);
+            bot.SendRaw(msg);
           }
         }
       });
@@ -567,7 +476,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
 
   private static final int meterLength = 104;
   private static final int fov = 40;
-  private static final char blank = ' ';
+  private static final char blank = '-';
   private static final char target = ':';
   private String createDirectionMeter(Pose camera, Pose anchor) {
     // NOTE:
