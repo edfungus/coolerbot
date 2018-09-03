@@ -271,6 +271,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
           if (newState == BluetoothProfile.STATE_CONNECTED) {
             bluetoothConnected = true;
             hideSnack();
+            bluetoothGatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
             bluetoothGatt.discoverServices();
           }
           if (newState == BluetoothProfile.STATE_DISCONNECTED) {
@@ -422,17 +423,16 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
                     createDirectionMeter(camera.getPose(), anchors.get(0).anchor.getPose()), distanceBetweenPoses(anchors.get(0).anchor.getPose(), camera.getPose()));
             mainText.setText(msg);
           }
+          if (!anchors.isEmpty()) {
+//            mainText.setText(String.format(Locale.ENGLISH,"%s\nx: %.2f y: %.2f z: %.2f w: %.2f x: %.2f y: %.2f z: %.2f",
+            String msg = String.format(Locale.ENGLISH,"%s\ndistance: %.2f",
+                    createDirectionMeter(camera.getPose(), anchors.get(0).anchor.getPose()), distanceBetweenPoses(anchors.get(0).anchor.getPose(), camera.getPose()));
+            BluetoothGattCharacteristic ch = bluetoothGatt.getService(serviceUUID).getCharacteristic(characteristicUUID);
+            ch.setValue(msg);
+            bluetoothGatt.writeCharacteristic(ch);
+          }
         }
       });
-
-      if (!anchors.isEmpty()) {
-//            mainText.setText(String.format(Locale.ENGLISH,"%s\nx: %.2f y: %.2f z: %.2f w: %.2f x: %.2f y: %.2f z: %.2f",
-        String msg = String.format(Locale.ENGLISH,"%s\ndistance: %.2f",
-                createDirectionMeter(camera.getPose(), anchors.get(0).anchor.getPose()), distanceBetweenPoses(anchors.get(0).anchor.getPose(), camera.getPose()));
-        BluetoothGattCharacteristic ch = bluetoothGatt.getService(serviceUUID).getCharacteristic(characteristicUUID);
-        ch.setValue(msg);
-        bluetoothGatt.writeCharacteristic(ch);
-      }
 
       // Draw background.
       backgroundRenderer.draw(frame);
@@ -567,7 +567,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
 
   private static final int meterLength = 104;
   private static final int fov = 40;
-  private static final char blank = '-';
+  private static final char blank = ' ';
   private static final char target = ':';
   private String createDirectionMeter(Pose camera, Pose anchor) {
     // NOTE:
