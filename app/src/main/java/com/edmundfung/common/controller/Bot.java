@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
@@ -24,8 +25,8 @@ public class Bot {
     private static final UUID rxCharacteristicUUID =  UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
     private static String botMACAddress = "30:AE:A4:73:B2:26";
 
-    private final SnackbarHelper snackbar = new SnackbarHelper();
     private Activity activity;
+    private final SnackbarHelper snackbar = new SnackbarHelper();
 
     private BluetoothLeScanner scanner;
     private BluetoothGatt gatt;
@@ -61,8 +62,18 @@ public class Bot {
     }
 
     public void SendRaw(String s) {
+        if (gatt == null) {
+            return;
+        }
         if (rxCharacteristic == null) {
-            rxCharacteristic = gatt.getService(serviceUUID).getCharacteristic(rxCharacteristicUUID);
+            BluetoothGattService service = gatt.getService(serviceUUID);
+            if (service == null) {
+                return;
+            }
+            rxCharacteristic = service.getCharacteristic(rxCharacteristicUUID);
+            if(rxCharacteristic == null) {
+                return;
+            }
         }
         rxCharacteristic.setValue(s);
         gatt.writeCharacteristic(rxCharacteristic);

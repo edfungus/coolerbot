@@ -20,6 +20,8 @@ import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManager.DisplayListener;
 import android.view.Display;
 import android.view.WindowManager;
+
+import com.edmundfung.common.vision.Tracker;
 import com.google.ar.core.Session;
 
 /**
@@ -75,12 +77,12 @@ public final class DisplayRotationHelper implements DisplayListener {
    * function should be called explicitly before each call to {@link Session#update()}. This
    * function will also clear the 'pending update' (viewportChanged) flag.
    *
-   * @param session the {@link Session} object to update if display geometry changed.
+   * @param tracker the {@link Session} object to update if display geometry changed.
    */
-  public void updateSessionIfNeeded(Session session) {
+  public void updateSessionIfNeeded(Tracker tracker) {
     if (viewportChanged) {
       int displayRotation = display.getRotation();
-      session.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight);
+      tracker.SetDisplayGeometry(displayRotation, viewportWidth, viewportHeight);
       viewportChanged = false;
     }
   }
