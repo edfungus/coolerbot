@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 public class Tracker {
     private static final String TAG = Tracker.class.getSimpleName();
@@ -130,7 +131,7 @@ public class Tracker {
         session.setCameraTextureName(id);
     }
 
-    public void Update() throws CameraNotAvailableException, NotYetAvailableException {
+    public void Update() throws CameraNotAvailableException, NotYetAvailableException, NoSuchElementException {
         frame = session.update();
         removeNextAnchorIfClose(frame.getCamera().getPose());
 
@@ -174,13 +175,9 @@ public class Tracker {
         return anchors;
     }
 
-    private static final int meterLength = 104;
-    private static final int fov = 40;
-    private static final char blank = '-';
-    private static final char target = ':';
-    public String GetDirectionMeter() {
+    public double AngleToNextAnchor() {
         if (anchors.isEmpty()) {
-            return "";
+            return 0f;
         }
         Pose anchor = anchors.get(0).anchor.getPose();
         Pose camera = frame.getCamera().getPose();
@@ -194,8 +191,19 @@ public class Tracker {
         double relativeAngle = Math.toDegrees(Math.atan2((camera.tz() - anchor.tz()), (camera.tx() - anchor.tx())));
         double adjustment = quaternionToAngleY(camera);
         // Make it all clockwise
-        double absoluteAngle = Math.abs(relativeAngle - adjustment);
+        return Math.abs(relativeAngle - adjustment);
+    }
 
+    private static final int meterLength = 104;
+    private static final int fov = 40;
+    private static final char blank = '-';
+    private static final char target = ':';
+    public String GetDirectionMeter() {
+        if (anchors.isEmpty()) {
+            return "";
+        }
+
+        double absoluteAngle = AngleToNextAnchor();
         // We don't care about front vs back right now so flip everything to the front
         if (absoluteAngle > 180) {
             absoluteAngle = 360 - absoluteAngle;
@@ -252,7 +260,7 @@ public class Tracker {
         return distanceBetweenPoses(a.getPose(), p) < closenessThreshold;
     }
 
-    private float[] getBlobCoordinates(Frame f) throws NotYetAvailableException{
+    private float[] getBlobCoordinates(Frame f) throws NotYetAvailableException, NoSuchElementException {
         BlobFinder bf = new BlobFinder(f);
         List<Blob> blobs = bf.Find();
         Blob biggestBlob = Collections.max(blobs);

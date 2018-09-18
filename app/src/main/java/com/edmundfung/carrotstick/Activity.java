@@ -217,8 +217,9 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
         @Override
         public void run() {
           if (!tracker.GetAnchors().isEmpty()) {
-            String msg = String.format(Locale.ENGLISH,"%s\ndistance: %.2f", tracker.GetDirectionMeter(), tracker.DistanceToNextAnchor());
-            mainText.setText(msg);
+            String log = String.format(Locale.ENGLISH,"%s\ndistance: %.2f", tracker.GetDirectionMeter(), tracker.DistanceToNextAnchor());
+            mainText.setText(log);
+            String msg = String.format(Locale.ENGLISH,"angle: %.2f, distance: %.2f", tracker.AngleToNextAnchor(), tracker.DistanceToNextAnchor());
             bot.SendRaw(msg);
           }
         }
