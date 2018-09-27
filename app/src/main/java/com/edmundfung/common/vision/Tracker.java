@@ -41,9 +41,13 @@ public class Tracker {
 
     private Session session;
     private final List<ColoredAnchor> anchors = new ArrayList<>();
-    private static final int anchorCapacity = 5;
+    private static final int anchorCapacity = 20;
     private Frame frame;
     private boolean installRequested;
+
+    private long nextTrackTime = 0;
+    private static final long timeTillNextTrack = 200;
+    private boolean isMoving = false;
 
     public Tracker(Activity a) {
         activity = a;
@@ -123,6 +127,10 @@ public class Tracker {
         return session != null;
     }
 
+    public boolean IsMoving(){
+        return isMoving;
+    }
+
     public void SetDisplayGeometry(int rotation, int width, int height) {
         session.setDisplayGeometry(rotation, width, height);
     }
@@ -139,15 +147,26 @@ public class Tracker {
             return;
         }
 
-        MotionEvent tap = tapHelper.poll();
-        if (tap != null && IsTracking()){
-            float[] blobCoords = getBlobCoordinates(frame);
-            for (HitResult hit : frame.hitTest(blobCoords[0], blobCoords[1])) {
-                if (checkHit(hit)){
-                    addAnchor(hit.createAnchor());
-                    break;
+        if(System.nanoTime() > nextTrackTime && isMoving) {
+            try {
+                float[] blobCoords = getBlobCoordinates(frame);
+                for (HitResult hit : frame.hitTest(blobCoords[0], blobCoords[1])) {
+                    if (checkHit(hit)){
+                        addAnchor(hit.createAnchor());
+                        break;
+                    }
                 }
+                nextTrackTime = System.nanoTime() + timeTillNextTrack;
+            } catch (NotYetAvailableException | NoSuchElementException e) {
+                // hahaha ... ignore :P
             }
+         }
+
+        if (tapHelper.pollSingle() != null){
+            isMoving = !isMoving;
+        }
+        if (tapHelper.pollDouble() != null){
+            anchors.clear();
         }
 
         return;
@@ -281,6 +300,9 @@ public class Tracker {
 
     private void addAnchor(Anchor a){
         if (anchorCapacityFull()) {
+            return;
+        }
+        if (anchors.size() != 0 && distanceBetweenPoses(anchors.get(anchors.size() - 1).anchor.getPose(), a.getPose()) < .2) {
             return;
         }
         anchors.add(new ColoredAnchor(a));

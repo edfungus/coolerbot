@@ -219,8 +219,13 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
           if (!tracker.GetAnchors().isEmpty()) {
             String log = String.format(Locale.ENGLISH,"%s\ndistance: %.2f", tracker.GetDirectionMeter(), tracker.DistanceToNextAnchor());
             mainText.setText(log);
-            String msg = String.format(Locale.ENGLISH,"angle: %.2f, distance: %.2f", tracker.AngleToNextAnchor(), tracker.DistanceToNextAnchor());
-            bot.SendRaw(msg);
+//            String msg = String.format(Locale.ENGLISH,"angle: %.2f, distance: %.2f", tracker.AngleToNextAnchor(), tracker.DistanceToNextAnchor());
+            if(tracker.IsMoving()){
+              String msg = generateMessage(tracker);
+              bot.SendRaw(msg);
+            } else {
+              bot.SendRaw(encodeMessage(0,0,0,0));
+            }
           }
         }
       });
@@ -236,6 +241,33 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
       // Avoid crashing the application due to unhandled exceptions.
       Log.e(TAG, "Exception on the OpenGL thread", t);
     }
+  }
+
+  private String generateMessage(Tracker t) {
+    // Format is csv
+    // [L direction][L speed][R direction][R speed]
+    // direction: 0 = stop, 1 = forward, 2 = backwards
+    // speed: 0 to 255
+    if(t.GetAnchors().isEmpty()) {
+      return encodeMessage(0,0,0,0);
+    }
+    if(t.GetAnchors().size() == 1 && tracker.DistanceToNextAnchor() < .3) {
+      return encodeMessage(0,0,0,0);
+    }
+    // CHECK THE ANGLE... having some issues with anchor behind :(
+    double offAngle = Math.abs(tracker.AngleToNextAnchor()) - 90;
+    if(Math.abs(offAngle) > 10){
+      if(offAngle > 0){
+        return encodeMessage(1,60,2,60);
+      } else {
+        return encodeMessage(2,60,1,60);
+      }
+    }
+    return encodeMessage(1,125,1,125);
+  }
+
+  private String encodeMessage(int Rd, int Rs, int Ld, int Ls) {
+    return String.format(Locale.ENGLISH, "%01d%03d%01d%03d", Rd, Rs, Ld, Ls);
   }
 
   private void drawARObjects(Frame frame){

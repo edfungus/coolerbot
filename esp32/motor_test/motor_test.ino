@@ -27,13 +27,13 @@ void loop()
   ledcWrite(1, 255);
   ledcWrite(2, 255);
   delay(200);
-  digitalWrite(pinLIN1, HIGH);
-  digitalWrite(pinLIN2, LOW);
-  digitalWrite(pinRIN1, LOW);
-  digitalWrite(pinRIN2, HIGH);
+  digitalWrite(pinLIN1, 1);
+  digitalWrite(pinLIN2, 0);
+  digitalWrite(pinRIN1, 0);
+  digitalWrite(pinRIN2, 1);
   delay(200);
-  digitalWrite(pinLIN1, LOW);
-  digitalWrite(pinLIN2, HIGH);
-  digitalWrite(pinRIN1, HIGH);
-  digitalWrite(pinRIN2, LOW);
+  digitalWrite(pinLIN1, 0);
+  digitalWrite(pinLIN2, 1);
+  digitalWrite(pinRIN1, 1);
+  digitalWrite(pinRIN2, 0);
 }
