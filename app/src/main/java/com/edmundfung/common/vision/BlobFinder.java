@@ -7,7 +7,9 @@ import android.util.Log;
 import com.google.ar.core.Frame;
 import com.google.ar.core.exceptions.NotYetAvailableException;
 
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 
 public class BlobFinder {
@@ -77,11 +79,14 @@ public class BlobFinder {
     private static final float screenX = 1080;
 
     // ScaleCoordsToScreen scales the x,y of the image to the x,y of a touch event
-    public float[] ScaleCoordsToScreen(int x, int y) {
+    public ArrayList<Float> ScaleCoordsToScreen(int x, int y) {
         float thx = screenX - (((float) y * screenX) / (float) height);
         float twy = ((float) x * screenY) / (float) width;
 //        Log.d("EDMUND", String.format("x: %d, y:%d, tw: %f, th: %f, w: %d, h: %d", x, y, twy, thx, width, height));
-        return new float[]{thx, twy};
+        ArrayList<Float> results = new ArrayList<Float>();
+        results.add(thx);
+        results.add(twy);
+        return results;
     }
 }
 

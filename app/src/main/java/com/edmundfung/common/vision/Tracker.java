@@ -143,16 +143,16 @@ public class Tracker {
         frame = session.update();
         removeNextAnchorIfClose(frame.getCamera().getPose());
 
-        if (anchorCapacityFull()) {
+        if (anchorCapacityFull() || !IsTracking()) {
             return;
         }
 
-        if(System.nanoTime() > nextTrackTime && isMoving) {
+        if(checkTaps() || (System.nanoTime() > nextTrackTime && isMoving)) {
             try {
-                float[] blobCoords = getBlobCoordinates(frame);
-                for (HitResult hit : frame.hitTest(blobCoords[0], blobCoords[1])) {
+                ArrayList<Float> blobData = getBlob(frame);
+                for (HitResult hit : frame.hitTest(blobData.get(0), blobData.get(1))) {
                     if (checkHit(hit)){
-                        addAnchor(hit.createAnchor());
+                        addAnchor(hit.createAnchor(), blobData.get(2));
                         break;
                     }
                 }
@@ -161,15 +161,6 @@ public class Tracker {
                 // hahaha ... ignore :P
             }
          }
-
-        if (tapHelper.pollSingle() != null){
-            isMoving = !isMoving;
-        }
-        if (tapHelper.pollDouble() != null){
-            anchors.clear();
-        }
-
-        return;
     }
 
     public Frame GetFrame() {
@@ -210,7 +201,14 @@ public class Tracker {
         double relativeAngle = Math.toDegrees(Math.atan2((camera.tz() - anchor.tz()), (camera.tx() - anchor.tx())));
         double adjustment = quaternionToAngleY(camera);
         // Make it all clockwise
-        return Math.abs(relativeAngle - adjustment);
+        double angle = relativeAngle - adjustment - 90;
+        if (angle > 180) {
+            angle = angle - 360;
+        }
+        if (angle < -180) {
+            angle = angle + 360;
+        }
+        return angle;
     }
 
     private static final int meterLength = 104;
@@ -222,7 +220,7 @@ public class Tracker {
             return "";
         }
 
-        double absoluteAngle = AngleToNextAnchor();
+        double absoluteAngle = Math.abs(AngleToNextAnchor() + 90);
         // We don't care about front vs back right now so flip everything to the front
         if (absoluteAngle > 180) {
             absoluteAngle = 360 - absoluteAngle;
@@ -268,6 +266,40 @@ public class Tracker {
         return session.getAllTrackables(type);
     }
 
+    public float GetNextScore() {
+        if (!anchors.isEmpty()) {
+            return anchors.get(0).score;
+        }
+        return 0f;
+    }
+
+    // checkTaps check for tap operations. It returns true if we should look for object
+    private boolean checkTaps() {
+        if (tapHelper.pollDouble() != null){
+            Log.d("EDMUND", "double");
+            isMoving = !isMoving;
+            return false;
+        }
+        if (tapHelper.pollSingle() != null){
+            Log.d("EDMUND", "single");
+            if (isMoving) {
+                if (!anchors.isEmpty()){
+                    anchors.get(0).anchor.detach();
+                    anchors.remove(0);
+                }
+            } else {
+                return true;
+            }
+        }
+        if (tapHelper.pollLong() != null){
+            Log.d("EDMUND", "long");
+            if (!isMoving) {
+                anchors.clear();
+            }
+        }
+        return false;
+    }
+
     private void removeNextAnchorIfClose(Pose currentPose) {
         if (!anchors.isEmpty() && isAnchorClose(anchors.get(0).anchor, currentPose)) {
             anchors.get(0).anchor.detach();
@@ -279,11 +311,13 @@ public class Tracker {
         return distanceBetweenPoses(a.getPose(), p) < closenessThreshold;
     }
 
-    private float[] getBlobCoordinates(Frame f) throws NotYetAvailableException, NoSuchElementException {
+    private ArrayList<Float> getBlob(Frame f) throws NotYetAvailableException, NoSuchElementException {
         BlobFinder bf = new BlobFinder(f);
         List<Blob> blobs = bf.Find();
         Blob biggestBlob = Collections.max(blobs);
-        return bf.ScaleCoordsToScreen(biggestBlob.GetCenter()[0], biggestBlob.GetCenter()[1]);
+        ArrayList<Float> results = bf.ScaleCoordsToScreen(biggestBlob.GetCenter()[0], biggestBlob.GetCenter()[1]);
+        results.add(biggestBlob.GetScore());
+        return results;
     }
 
     // checkHit ensures that the hit was on a plane
@@ -298,14 +332,14 @@ public class Tracker {
         return anchors.size() >= anchorCapacity;
     }
 
-    private void addAnchor(Anchor a){
+    private void addAnchor(Anchor a, float s){
         if (anchorCapacityFull()) {
             return;
         }
         if (anchors.size() != 0 && distanceBetweenPoses(anchors.get(anchors.size() - 1).anchor.getPose(), a.getPose()) < .2) {
             return;
         }
-        anchors.add(new ColoredAnchor(a));
+        anchors.add(new ColoredAnchor(a, s));
     }
 
     // quaternionToAngleY takes a pose and returns the angle from origin in the qy direction

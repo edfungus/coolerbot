@@ -7,10 +7,12 @@ import java.util.Random;
 public class ColoredAnchor {
     public final Anchor anchor;
     public final float[] color;
+    public float score;
 
-    public ColoredAnchor(Anchor a) {
+    public ColoredAnchor(Anchor a, float s) {
         this.anchor = a;
         this.color = new float[] {randomColorFloat(), randomColorFloat(), randomColorFloat(), 255.0f};
+        this.score = s;
     }
 
     public ColoredAnchor(Anchor a, float[] color4f) {

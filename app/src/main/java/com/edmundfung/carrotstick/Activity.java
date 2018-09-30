@@ -216,17 +216,14 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
       new Runnable() {
         @Override
         public void run() {
-          if (!tracker.GetAnchors().isEmpty()) {
-            String log = String.format(Locale.ENGLISH,"%s\ndistance: %.2f", tracker.GetDirectionMeter(), tracker.DistanceToNextAnchor());
-            mainText.setText(log);
-//            String msg = String.format(Locale.ENGLISH,"angle: %.2f, distance: %.2f", tracker.AngleToNextAnchor(), tracker.DistanceToNextAnchor());
-            if(tracker.IsMoving()){
-              String msg = generateMessage(tracker);
+            if(tracker.IsMoving() && tracker.IsTracking()){
+              String msg = generateRobotControl(tracker);
               bot.SendRaw(msg);
             } else {
               bot.SendRaw(encodeMessage(0,0,0,0));
             }
-          }
+            String log = String.format(Locale.ENGLISH,"%b \n%d \n%.2f \n%.2f", tracker.IsMoving(), tracker.GetAnchors().size(), tracker.GetNextScore(), tracker.AngleToNextAnchor());
+            mainText.setText(log);
         }
       });
 
@@ -243,7 +240,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
     }
   }
 
-  private String generateMessage(Tracker t) {
+  private String generateRobotControl(Tracker t) {
     // Format is csv
     // [L direction][L speed][R direction][R speed]
     // direction: 0 = stop, 1 = forward, 2 = backwards
@@ -254,13 +251,16 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
     if(t.GetAnchors().size() == 1 && tracker.DistanceToNextAnchor() < .3) {
       return encodeMessage(0,0,0,0);
     }
-    // CHECK THE ANGLE... having some issues with anchor behind :(
-    double offAngle = Math.abs(tracker.AngleToNextAnchor()) - 90;
+    double offAngle = tracker.AngleToNextAnchor();
     if(Math.abs(offAngle) > 10){
+      int speed = (int) Math.abs(offAngle) + 60;
+      if (speed > 150) {
+        speed = 150;
+      }
       if(offAngle > 0){
-        return encodeMessage(1,60,2,60);
+        return encodeMessage(1,speed,2,speed);
       } else {
-        return encodeMessage(2,60,1,60);
+        return encodeMessage(2,speed,1,speed);
       }
     }
     return encodeMessage(1,125,1,125);

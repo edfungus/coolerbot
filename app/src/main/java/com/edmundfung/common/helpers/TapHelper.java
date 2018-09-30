@@ -30,6 +30,7 @@ public final class TapHelper implements OnTouchListener {
   private final GestureDetector gestureDetector;
     private final BlockingQueue<MotionEvent> queuedSingleTaps = new ArrayBlockingQueue<>(16);
     private final BlockingQueue<MotionEvent> queuedDoubleTaps = new ArrayBlockingQueue<>(16);
+    private final BlockingQueue<MotionEvent> queuedLongTaps = new ArrayBlockingQueue<>(16);
 
   /**
    * Creates the tap helper.
@@ -42,7 +43,7 @@ public final class TapHelper implements OnTouchListener {
             context,
             new GestureDetector.SimpleOnGestureListener() {
               @Override
-              public boolean onSingleTapUp(MotionEvent e) {
+              public boolean onSingleTapConfirmed(MotionEvent e) {
                 // Queue tap if there is space. Tap is lost if queue is full.
                 queuedSingleTaps.offer(e);
                 return true;
@@ -58,6 +59,10 @@ public final class TapHelper implements OnTouchListener {
                   queuedDoubleTaps.offer(e);
                   return true;
               }
+              @Override
+              public void onLongPress(MotionEvent e) {
+                  queuedLongTaps.offer(e);
+              }
             });
   }
 
@@ -66,16 +71,14 @@ public final class TapHelper implements OnTouchListener {
    *
    * @return if a tap was queued, a MotionEvent for the tap. Otherwise null if no taps are queued.
    */
-  public MotionEvent pollSingle() {
-      return queuedSingleTaps.poll();
-  }
+    public MotionEvent pollSingle() { return queuedSingleTaps.poll(); }
 
-  public MotionEvent pollDouble() {
-        return queuedDoubleTaps.poll();
+    public MotionEvent pollDouble() { return queuedDoubleTaps.poll(); }
+
+    public MotionEvent pollLong() {   return queuedLongTaps.poll(); }
+
+    @Override
+    public boolean onTouch(View view, MotionEvent motionEvent) {
+        return gestureDetector.onTouchEvent(motionEvent);
     }
-
-  @Override
-  public boolean onTouch(View view, MotionEvent motionEvent) {
-    return gestureDetector.onTouchEvent(motionEvent);
-  }
 }
