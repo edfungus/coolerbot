@@ -35,6 +35,8 @@ import com.edmundfung.common.rendering.ObjectRenderer;
 import com.edmundfung.common.rendering.PlaneRenderer;
 import com.edmundfung.common.rendering.PointCloudRenderer;
 import com.edmundfung.common.vision.ColoredAnchor;
+import com.edmundfung.common.vision.Human;
+import com.edmundfung.common.vision.TensorFlowPoseDetector;
 import com.edmundfung.common.vision.Tracker;
 import com.google.ar.core.Frame;
 import com.google.ar.core.Plane;
@@ -42,6 +44,7 @@ import com.google.ar.core.PointCloud;
 import com.google.ar.core.TrackingState;
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Vector;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -67,7 +70,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
   private final PointCloudRenderer pointCloudRenderer = new PointCloudRenderer();
 
   private final Bot bot = new Bot(this);
-  private final Tracker tracker = new Tracker(this);
+  private Tracker tracker;
 
   // Temporary matrix allocated here to reduce number of allocations for each frame.
   private final float[] anchorMatrix = new float[16];
@@ -82,6 +85,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
     // Set up tap listener.
     tapHelper = new TapHelper(/*context=*/ this);
     surfaceView.setOnTouchListener(tapHelper);
+    tracker = new Tracker(this, getAssets());
     tracker.SetTapHelper(tapHelper);
 
     // Set up renderer.
@@ -209,6 +213,7 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
       // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
       // camera framerate.
       tracker.Update();
+      tracker.Track();
       Frame frame = tracker.GetFrame();
 
       // Print distance
@@ -229,6 +234,8 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
 
       // Draw background.
       backgroundRenderer.draw(frame);
+
+      // Draw bitmap here
 
       // If not tracking, don't draw 3d objects.
       if (tracker.IsTracking()) {

@@ -1,6 +1,10 @@
 package com.edmundfung.common.vision;
 
 import android.app.Activity;
+import android.content.res.AssetManager;
+import android.media.Image;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
 import android.view.MotionEvent;
 
@@ -18,6 +22,7 @@ import com.google.ar.core.Session;
 import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
+import com.google.ar.core.exceptions.DeadlineExceededException;
 import com.google.ar.core.exceptions.NotYetAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
@@ -30,6 +35,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Vector;
 
 public class Tracker {
     private static final String TAG = Tracker.class.getSimpleName();
@@ -49,9 +55,17 @@ public class Tracker {
     private static final long timeTillNextTrack = 200;
     private boolean isMoving = false;
 
-    public Tracker(Activity a) {
+    // tensorflow
+    private final TensorFlowPoseDetector poseDetector;
+    private boolean computingDetection = false;
+    private Handler handler;
+    private HandlerThread handlerThread;
+
+
+    public Tracker(Activity a, final AssetManager assetManager) {
         activity = a;
         installRequested = false;
+        poseDetector = new TensorFlowPoseDetector(assetManager);
     }
 
     public void SetTapHelper(TapHelper th){
@@ -59,6 +73,10 @@ public class Tracker {
     }
 
     public void Resume(){
+        handlerThread = new HandlerThread("inference");
+        handlerThread.start();
+        handler = new Handler(handlerThread.getLooper());
+
         if (session == null) {
             Exception exception = null;
             String message = null;
@@ -120,6 +138,15 @@ public class Tracker {
     }
 
     public void Pause() {
+        handlerThread.quitSafely();
+        try {
+            handlerThread.join();
+            handlerThread = null;
+            handler = null;
+        } catch (final InterruptedException e) {
+            // oops
+        }
+
         session.pause();
     }
 
@@ -139,28 +166,49 @@ public class Tracker {
         session.setCameraTextureName(id);
     }
 
-    public void Update() throws CameraNotAvailableException, NotYetAvailableException, NoSuchElementException {
+    public void Update() throws CameraNotAvailableException {
         frame = session.update();
+    }
+
+    public void Track() throws NoSuchElementException {
         removeNextAnchorIfClose(frame.getCamera().getPose());
 
         if (anchorCapacityFull() || !IsTracking()) {
             return;
         }
 
-        if(checkTaps() || (System.nanoTime() > nextTrackTime && isMoving)) {
-            try {
-                ArrayList<Float> blobData = getBlob(frame);
-                for (HitResult hit : frame.hitTest(blobData.get(0), blobData.get(1))) {
-                    if (checkHit(hit)){
-                        addAnchor(hit.createAnchor(), blobData.get(2));
-                        break;
-                    }
+        if (computingDetection) {
+            return;
+        }
+        computingDetection = true;
+        runInBackground(
+                new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Vector<Human> humans = poseDetector.FindHumans(frame);
+                    Log.e("EDMUND tensorflow human count", String.valueOf(humans.size()));
+                } catch(NotYetAvailableException | DeadlineExceededException e) {
+                    // haha...
                 }
-                nextTrackTime = System.nanoTime() + timeTillNextTrack;
-            } catch (NotYetAvailableException | NoSuchElementException e) {
-                // hahaha ... ignore :P
+                computingDetection = false;
             }
-         }
+        });
+
+//        if(checkTaps() || (System.nanoTime() > nextTrackTime && isMoving)) {
+//            try {
+//                ArrayList<Float> blobData = getBlob(frame);
+//                for (HitResult hit : frame.hitTest(blobData.get(0), blobData.get(1))) {
+//                    if (checkHit(hit)){
+//                        addAnchor(hit.createAnchor(), blobData.get(2));
+//                        break;
+//                    }
+//                }
+//                nextTrackTime = System.nanoTime() + timeTillNextTrack;
+//            } catch (NotYetAvailableException | NoSuchElementException e) {
+//                // hahaha ... ignore :P
+//            }
+//         }
     }
 
     public Frame GetFrame() {
@@ -209,6 +257,12 @@ public class Tracker {
             angle = angle + 360;
         }
         return angle;
+    }
+
+    protected synchronized void runInBackground(final Runnable r) {
+        if (handler != null) {
+            handler.post(r);
+        }
     }
 
     private static final int meterLength = 104;
