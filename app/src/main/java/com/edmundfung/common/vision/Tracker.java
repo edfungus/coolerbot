@@ -2,12 +2,20 @@ package com.edmundfung.common.vision;
 
 import android.app.Activity;
 import android.content.res.AssetManager;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.media.Image;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 
+import com.edmundfung.carrotstick.R;
 import com.edmundfung.common.helpers.CameraPermissionHelper;
 import com.edmundfung.common.helpers.SnackbarHelper;
 import com.edmundfung.common.helpers.TapHelper;
@@ -50,9 +58,6 @@ public class Tracker {
     private static final int anchorCapacity = 20;
     private Frame frame;
     private boolean installRequested;
-
-    private long nextTrackTime = 0;
-    private static final long timeTillNextTrack = 200;
     private boolean isMoving = false;
 
     // tensorflow
@@ -60,12 +65,24 @@ public class Tracker {
     private boolean computingDetection = false;
     private Handler handler;
     private HandlerThread handlerThread;
+    private ImageView trackingOverlay;
+    private Bitmap copyBitmap;
 
 
     public Tracker(Activity a, final AssetManager assetManager) {
         activity = a;
         installRequested = false;
         poseDetector = new TensorFlowPoseDetector(assetManager);
+
+        FrameLayout root = (FrameLayout)a.findViewById(R.id.root);
+        ImageView img = new ImageView(a.getBaseContext());
+        img.setBackgroundColor(Color.MAGENTA);
+
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(368, 368);
+        params.leftMargin = 0;
+        params.topMargin  = 1920-368;
+        root.addView(img, params);
+        trackingOverlay = img;
     }
 
     public void SetTapHelper(TapHelper th){
@@ -177,23 +194,77 @@ public class Tracker {
             return;
         }
 
+        activity.runOnUiThread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        trackingOverlay.setImageBitmap(copyBitmap);
+//                    for (Human human : humans) {
+//                        if (human.coords_index_assigned[10] && human.coords_index_assigned[13]) {
+//                            // convert to 480 x 480
+//                            int rightX = (human.parts_coords[10][0] * 8 * 480) / 368;
+//                            int rightY = (human.parts_coords[10][1] * 8 * 480) / 368;
+//                            int leftX = (human.parts_coords[13][0] * 8 * 480) / 368;
+//                            int leftY = (human.parts_coords[13][1] * 8 * 480) / 368;
+//                            int middleX = (rightX + leftX) / 2;
+//                            int middleY = rightY;
+//                            if (leftY > rightY) {
+//                                middleY = leftY;
+//                            }
+//
+//                            final int screenY = 1920;
+//                            final int screenX = 1080;
+//                            // X and Y should be flipped because of 90 rotation HOWEVER, it should also be flipped for the to screen conversion
+//                            int x = (middleX * screenX) / 480;
+//                            int y = (middleY * screenY) / 640;
+//                            Log.e("EDMUND tensorflow human coordinates", String.format("raw: %d, %d final: %d, %d", middleX, middleY, x, y));
+//                            for (HitResult hit : frame.hitTest(x, y)) {
+//                                if (checkHit(hit)){
+//                                    addAnchor(hit.createAnchor(), 0f);
+//                                    Log.e("EDMUND tensorflow human", "HIT");
+//                                    break;
+//                                }
+//                                Log.e("EDMUND tensorflow human miss plane", "");
+//
+//                            }
+//                        }
+//                    }
+                    }
+                });
+
         if (computingDetection) {
             return;
         }
         computingDetection = true;
         runInBackground(
-                new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    Vector<Human> humans = poseDetector.FindHumans(frame);
-                    Log.e("EDMUND tensorflow human count", String.valueOf(humans.size()));
-                } catch(NotYetAvailableException | DeadlineExceededException e) {
-                    // haha...
+            new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Bitmap bitmap = poseDetector.GetBitmap(frame);
+                        if(bitmap == null) {
+                            return;
+                        }
+                        Vector<Human> humans = poseDetector.FindHumans(bitmap);
+                        Log.e("EDMUND tensorflow human count", String.valueOf(humans.size()));
+
+                        copyBitmap = Bitmap.createBitmap(bitmap);
+                        final Canvas canvas = new Canvas(copyBitmap);
+                        final Paint paint = new Paint();
+                        paint.setColor(Color.RED);
+                        paint.setStyle(Paint.Style.STROKE);
+                        paint.setStrokeWidth(2.0f);
+                        for (final Human human : humans) {
+                            drawAllPoints(canvas, paint, human);
+                            drawAllConnections(canvas, paint, human);
+                        }
+                    } catch(NotYetAvailableException | DeadlineExceededException e) {
+                        // haha...
+                    }
+                    computingDetection = false;
                 }
-                computingDetection = false;
             }
-        });
+        );
 
 //        if(checkTaps() || (System.nanoTime() > nextTrackTime && isMoving)) {
 //            try {
@@ -421,5 +492,53 @@ public class Tracker {
         float dz = p1.tz() - p2.tz();
         return (float) Math.sqrt(dx*dx + dy*dy + dz*dz);
     }
+
+    private void drawAllPoints(Canvas canvas, Paint paint, Human human) {
+        final int points[][] = human.parts_coords;
+        for (int i = 0; i < points.length; i++) {
+            canvas.drawCircle((float) points[i][1]*drawScale, (float) points[i][0]*drawScale, 1, paint);
+//            Log.e("EDMUND", String.format("%d: %d, %d", i,points[i][1]*drawScale, points[i][0]*drawScale));
+        }
+    }
+
+    private void drawAllConnections(Canvas canvas, Paint paint, Human human) {
+        // face
+        drawConnection(canvas, paint, human, 0,1);
+        drawConnection(canvas, paint, human, 0,14);
+        drawConnection(canvas, paint, human, 14,16);
+        drawConnection(canvas, paint, human, 0,15);
+        drawConnection(canvas, paint, human, 15,17);
+
+        // right arm
+        drawConnection(canvas, paint, human, 2,3);
+        drawConnection(canvas, paint, human, 3,4);
+
+        //left arm
+        drawConnection(canvas, paint, human, 5,6);
+        drawConnection(canvas, paint, human, 6,7);
+
+        // right leg
+        drawConnection(canvas, paint, human, 8,9);
+        drawConnection(canvas, paint, human, 9,10);
+
+        // left leg
+        drawConnection(canvas, paint, human, 11,12);
+        drawConnection(canvas, paint, human, 12,13);
+
+        // body
+        drawConnection(canvas, paint, human, 1,2);
+        drawConnection(canvas, paint, human, 1,5);
+        drawConnection(canvas, paint, human, 2,8);
+        drawConnection(canvas, paint, human, 5,11);
+        drawConnection(canvas, paint, human, 8,11);
+    }
+
+    private final int drawScale = 8;
+    private void drawConnection(Canvas canvas, Paint paint, Human human, int a, int b) {
+        if (human.coords_index_assigned[a] && human.coords_index_assigned[b]) {
+            canvas.drawLine((float) human.parts_coords[a][1]*drawScale, (float) human.parts_coords[a][0]*drawScale, (float) human.parts_coords[b][1]*drawScale, (float) human.parts_coords[b][0]*drawScale, paint);
+        }
+    }
 }
+
 

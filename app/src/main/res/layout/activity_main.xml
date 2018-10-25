@@ -13,19 +13,26 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="match_parent">
     tools:context="com.edmundfung.carrotstick.Activity">
 
-  <android.opengl.GLSurfaceView
-      android:id="@+id/surfaceview"
-      android:layout_width="fill_parent"
-      android:layout_height="fill_parent"
-      android:layout_gravity="top"/>
+    <!--<com.edmundfung.common.rendering.OverlayView-->
+        <!--android:id="@+id/tracking_overlay"-->
+        <!--android:layout_width="fill_parent"-->
+        <!--android:layout_height="fill_parent"-->
+        <!--android:layout_gravity="top" />-->
 
-  <TextView
+
+    <android.opengl.GLSurfaceView
+        android:id="@+id/surfaceview"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"/>
+
+    <TextView
       android:id="@+id/mainText"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
@@ -35,4 +42,4 @@
       android:textColor="#ffffff"
       android:background="#55000000"/>
 
-</RelativeLayout>
+</FrameLayout>

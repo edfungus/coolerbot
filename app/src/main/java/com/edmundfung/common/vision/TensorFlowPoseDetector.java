@@ -66,7 +66,8 @@ public class TensorFlowPoseDetector {
         output = new float[MapHeight * MapWidth * (HeatMapCount + PafMapCount)];
     }
 
-    public Vector<Human> FindHumans(Frame frame) throws NotYetAvailableException {
+
+    public Bitmap GetBitmap(Frame frame) throws NotYetAvailableException {
         Image image = frame.acquireCameraImage();
         Bitmap bitmap = imageToBitmap(image);
         image.close();
@@ -75,8 +76,7 @@ public class TensorFlowPoseDetector {
         // rotate 90 degrees clockwise
         Matrix matrix = new Matrix();
         matrix.postRotate(90);
-        bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-        return FindHumans(bitmap);
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
     }
 
     public Vector<Human> FindHumans(final Bitmap bitmap) {

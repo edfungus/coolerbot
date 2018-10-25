@@ -16,11 +16,18 @@
 
 package com.edmundfung.carrotstick;
 
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.app.AppCompatDelegate;
 import android.util.Log;
+import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -96,7 +103,6 @@ public class Activity extends AppCompatActivity implements GLSurfaceView.Rendere
     surfaceView.setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
 
     mainText = findViewById(R.id.mainText);
-
   }
 
   @Override
