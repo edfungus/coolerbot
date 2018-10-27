@@ -67,6 +67,8 @@ public class Tracker {
     private HandlerThread handlerThread;
     private ImageView trackingOverlay;
     private Bitmap copyBitmap;
+    private static final int actualBitmapSize = 1439;
+    private static final int bitmapHorzOffset = (int) Math.rint((actualBitmapSize - 1080) / 2.0);
 
 
     public Tracker(Activity a, final AssetManager assetManager) {
@@ -76,13 +78,14 @@ public class Tracker {
 
         FrameLayout root = (FrameLayout)a.findViewById(R.id.root);
         ImageView img = new ImageView(a.getBaseContext());
-        img.setBackgroundColor(Color.MAGENTA);
+//        img.setBackgroundColor(Color.MAGENTA);
 
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(368, 368);
-        params.leftMargin = 0;
-        params.topMargin  = 1920-368;
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(actualBitmapSize, actualBitmapSize);
+        params.leftMargin = -1 * bitmapHorzOffset;
+        params.topMargin  = 0;
         root.addView(img, params);
         trackingOverlay = img;
+        trackingOverlay.setImageAlpha(80);
     }
 
     public void SetTapHelper(TapHelper th){
@@ -195,42 +198,13 @@ public class Tracker {
         }
 
         activity.runOnUiThread(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        trackingOverlay.setImageBitmap(copyBitmap);
-//                    for (Human human : humans) {
-//                        if (human.coords_index_assigned[10] && human.coords_index_assigned[13]) {
-//                            // convert to 480 x 480
-//                            int rightX = (human.parts_coords[10][0] * 8 * 480) / 368;
-//                            int rightY = (human.parts_coords[10][1] * 8 * 480) / 368;
-//                            int leftX = (human.parts_coords[13][0] * 8 * 480) / 368;
-//                            int leftY = (human.parts_coords[13][1] * 8 * 480) / 368;
-//                            int middleX = (rightX + leftX) / 2;
-//                            int middleY = rightY;
-//                            if (leftY > rightY) {
-//                                middleY = leftY;
-//                            }
-//
-//                            final int screenY = 1920;
-//                            final int screenX = 1080;
-//                            // X and Y should be flipped because of 90 rotation HOWEVER, it should also be flipped for the to screen conversion
-//                            int x = (middleX * screenX) / 480;
-//                            int y = (middleY * screenY) / 640;
-//                            Log.e("EDMUND tensorflow human coordinates", String.format("raw: %d, %d final: %d, %d", middleX, middleY, x, y));
-//                            for (HitResult hit : frame.hitTest(x, y)) {
-//                                if (checkHit(hit)){
-//                                    addAnchor(hit.createAnchor(), 0f);
-//                                    Log.e("EDMUND tensorflow human", "HIT");
-//                                    break;
-//                                }
-//                                Log.e("EDMUND tensorflow human miss plane", "");
-//
-//                            }
-//                        }
-//                    }
-                    }
-                });
+            new Runnable() {
+                @Override
+                public void run() {
+                    trackingOverlay.setImageBitmap(copyBitmap);
+                }
+            }
+        );
 
         if (computingDetection) {
             return;
@@ -258,6 +232,7 @@ public class Tracker {
                             drawAllPoints(canvas, paint, human);
                             drawAllConnections(canvas, paint, human);
                         }
+                        findStanding(canvas, humans);
                     } catch(NotYetAvailableException | DeadlineExceededException e) {
                         // haha...
                     }
@@ -333,6 +308,52 @@ public class Tracker {
     protected synchronized void runInBackground(final Runnable r) {
         if (handler != null) {
             handler.post(r);
+        }
+    }
+
+    private void findStanding(Canvas canvas, Vector<Human> humans){
+        int scaleFactor = 8;
+        for (Human human : humans) {
+            if (human.coords_index_assigned[9] && human.coords_index_assigned[10] && human.coords_index_assigned[12] && human.coords_index_assigned[13]) {
+                // also scale coords to real size
+                int rightAnkleY = (human.parts_coords[10][0] * scaleFactor * actualBitmapSize) / 368;
+                int rightAnkleX = (human.parts_coords[10][1] * scaleFactor * actualBitmapSize) / 368;
+                int rightKneeY = (human.parts_coords[9][0] * scaleFactor * actualBitmapSize) / 368;
+                int rightKneeX = (human.parts_coords[9][1] * scaleFactor * actualBitmapSize) / 368;
+                int leftAnkleY = (human.parts_coords[13][0] * scaleFactor * actualBitmapSize) / 368;
+                int leftAnkleX = (human.parts_coords[13][1] * scaleFactor * actualBitmapSize) / 368;
+                int leftKneeY = (human.parts_coords[12][0] * scaleFactor * actualBitmapSize) / 368;
+                int leftKneeX = (human.parts_coords[12][1] * scaleFactor * actualBitmapSize) / 368;
+                int middleX = (rightAnkleX + leftAnkleX) / 2;
+                int middleY = rightAnkleY;
+                int legLength = (int) distanceBetweenPoints(rightAnkleX, rightAnkleY, rightKneeX, rightKneeY);
+                if (leftAnkleY > rightAnkleY) {
+                    middleY = leftAnkleY;
+                    legLength = (int) distanceBetweenPoints(leftAnkleX, leftAnkleY, leftKneeX, leftKneeY);
+                }
+                // Our horz axis is larger than our AR horz
+                middleX = middleX - bitmapHorzOffset;
+
+                // Account for feet location from ankle location and lower leg height
+                middleY = middleY + (int) (legLength * 0.15);
+
+                final Paint paint = new Paint();
+                paint.setColor(Color.BLUE);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(3.0f);
+                canvas.drawCircle((middleX + bitmapHorzOffset) * (float) (368.0 / actualBitmapSize), middleY * (float) (368.0 /  actualBitmapSize), 2, paint);
+
+                // (X is 1080 and Y is 1920)
+                Log.e("EDMUND tensorflow human coordinates", String.format("x: %d y: %d leg: %d offset: %d", middleX, middleY, legLength, (int) (legLength * 0.15)));
+                for (HitResult hit : frame.hitTest(middleX, middleY)) {
+                    if (checkHit(hit)){
+                        addAnchor(hit.createAnchor(), 0f);
+                        Log.e("EDMUND tensorflow human", "HIT");
+                        break;
+                    }
+                    Log.e("EDMUND tensorflow human miss plane", "");
+                }
+            }
         }
     }
 
@@ -461,7 +482,7 @@ public class Tracker {
         if (anchorCapacityFull()) {
             return;
         }
-        if (anchors.size() != 0 && distanceBetweenPoses(anchors.get(anchors.size() - 1).anchor.getPose(), a.getPose()) < .2) {
+        if (anchors.size() != 0 && distanceBetweenPoses(anchors.get(anchors.size() - 1).anchor.getPose(), a.getPose()) < .005) {
             return;
         }
         anchors.add(new ColoredAnchor(a, s));
@@ -491,6 +512,10 @@ public class Tracker {
         float dy = p1.ty() - p2.ty();
         float dz = p1.tz() - p2.tz();
         return (float) Math.sqrt(dx*dx + dy*dy + dz*dz);
+    }
+
+    private double distanceBetweenPoints(int x1, int y1, int x2, int y2) {
+        return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
     }
 
     private void drawAllPoints(Canvas canvas, Paint paint, Human human) {
